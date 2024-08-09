@@ -8,24 +8,24 @@ from utils import get_date_range
 
 
 class INSPIREHepAPI:
-    def __init__(self, record: str = "literature", q: str = "", sort: str = None, size: str = "2", fields: list[str] = []):
-        #Initialise
+    def __init__(self, record: str = "literature", q: str = "", sort: str = None, size: str = "5", fields: list[str] = []):
+        # Initialise
         self.base_url = f"https://inspirehep.net/api/{record}"
         self.headers = {
             "Accept": "application/json"  # Indicates that the client expects a JSON response
         }
-        self.q :str= q
-        self.sort :str = sort
-        self.size :str = size
-        self.fields :list[str] = fields
+        self.q: str = q
+        self.sort: str = sort
+        self.size: str = size
+        self.fields: list[str] = fields
 
     def set_query(self, q: str) -> None:
         self.q = q
-    
-    def set_fields(self, fields: list[str])->None:
+
+    def set_fields(self, fields: list[str]) -> None:
         self.fields = fields
 
-    def search_papers(self) -> None:
+    def search_papers(self) -> dict:
         """
         Search for papers based on the query.
         """
@@ -33,66 +33,79 @@ class INSPIREHepAPI:
             'q': self.q,
             'sort': self.sort,
             'size': self.size,
-            #'fields': self.fields,
-
         }
         
-        response = requests.get(self.base_url, headers=self.headers, params = params)
+        response = requests.get(self.base_url, headers=self.headers, params=params)
         print(response.url)
         if response.status_code == 200:
             return response.json()
         else:
             response.raise_for_status()
 
-    def extract_nested_field(self, data: dict, field: str) -> str:
+    def extract_references_dois(self, references: list[dict]) -> list[str]:
+        """
+        Extracts the 'dois' from each reference in the references list.
+        
+        Args:
+            references (list[dict]): List of reference dictionaries.
+        
+        Returns:
+            List of DOIs found in all references.
+        """
+        dois_list = []
+        for reference in references:
+            dois = self.extract_nested_field(reference, 'reference.dois')
+            if dois:
+                dois_list.extend(dois)
+        return dois_list
+
+    def extract_nested_field(self, data: dict, field: str) -> any:
         """
         Extracts the nested field from the data. Handles lists of dictionaries.
+        
+        Args:
+            data (dict): The dictionary from which to extract the field.
+            field (str): The field to extract, specified as a dot-separated string.
+        
+        Returns:
+            The value of the nested field, or None if any part of the path is not found.
         """
         sub_fields = field.split(".")
         value = data
         for sub_field in sub_fields:
-            if sub_field != None:
-                if isinstance(value, list):
-                    # True subfield
-                    print(len(value))
-                    values: set = set()
-                    for i in range(0, len(value)):
-                        values.add(value[i][sub_field])
-                    return values if values else None
-                else:
-                    if sub_field in value:
-                        value = value[sub_field]
-                    else:
-                        return None
-        return value         
-            
-    def get_data(self) -> list[dict[str]]:
+            if isinstance(value, list):
+                value = [item.get(sub_field) for item in value if item.get(sub_field) is not None]
+            else:
+                value = value.get(sub_field, None)
+            if value is None:
+                break
+        return value
+
+    def get_data(self) -> list[dict[str, any]]:
         """
         Get specific data fields for papers based on the query.
         """
         data = self.search_papers()
-        results: list = []
+        results = []
         for paper in data['hits']['hits']:
-            metadata: str = paper['metadata']
-            result: dict = {}
-     #       print(metadata)
-     #       print('\n')
-            for field in fields:
-                try:
-                    result[field] = self.extract_nested_field(metadata, field)
-                except (KeyError,IndexError, TypeError) as e:
-                    result[field] = None
-            results.append(result) 
+            metadata = paper['metadata']
+            result = {}
+            for field in self.fields:
+                value = self.extract_nested_field(metadata, field)
+                if field == "references.reference.dois" and value:
+                    result[field] = self.extract_references_dois(metadata.get("references", []))
+                else:
+                    result[field] = value
+            results.append(result)
             print(result)
             print('\n')
+        return results
 
-        return results                 
-  
-  
 
 if __name__ == "__main__":
 
-    fields = ['publication_info.artid','dois.value','titles.title', 'imprints.date','citation_count']
+    fields = ['titles.title','references.reference.dois'
+              ,'publication_info.artid','dois.value','authors.recid', 'imprints.date','citation_count']
     api = INSPIREHepAPI(fields=fields)
     # sort-order: mostrecent, mostcited
     # Construct the query
@@ -105,6 +118,3 @@ if __name__ == "__main__":
     data: list[dict[str]] = api.get_data()
     #for i in range(0, len(data)):
         #print(data[i])
-
-    
-    
