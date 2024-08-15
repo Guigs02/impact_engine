@@ -1,14 +1,15 @@
 import os
+import concurrent.futures
 import requests
 import json
 import matplotlib.pyplot as plt
 import pandas as pd
-from pathlib import Path
+from api_client import APIClient
 from utils import get_date_range
 
 
-class INSPIREHepAPI:
-    def __init__(self, record: str = "literature", q: str = "", sort: str = None, size: str = "1000", fields: list[str] = []):
+class INSPIREHepAPI(APIClient):
+    def __init__(self, record: str = "literature", q: str = "", sort: str = None, size: str = "5", fields: list[str] = []):
         # Initialise
         self.base_url = f"https://inspirehep.net/api"
         self.record = record
@@ -32,11 +33,12 @@ class INSPIREHepAPI:
     def set_fields(self, fields: list[str]) -> None:
         self.fields = fields
 
-    def __fetch(self)-> dict:
+    def _fetch(self, page: int = 1)-> dict:
         params = {
             'q': self.q,
             'sort': self.sort,
             'size': self.size,
+            'page': page
         }
     
         response = requests.get(url=f'{self.base_url}/{self.record}', headers=self.headers, params=params)
@@ -45,11 +47,31 @@ class INSPIREHepAPI:
             return response.json()
         else:
             response.raise_for_status()
+
+    def fetch_all_pages(self) -> list[dict]:
+        page: int = 1
+        all_responses: list[dict] = []
+        while True:
+            if page == 2:
+                break
+            response_page = self._fetch(page=page)
+            #print(response_page)
+            hits = response_page.get('hits', {}).get('hits', [])
+            if not hits:
+                break
+            all_responses.append(response_page)
+            #print(all_responses)
+            page += 1
+        #print(f'Page {page} fetched, total results: {len(all_responses)}')
+
+        return all_responses
     
     def get_paper(self, dois: str) -> dict:
         query :str = f'dois.value:{dois}'
         self.set_params(q=query)
-        return self.__fetch()
+        return self._fetch()
+   ################################################################################### 
+    # In DataProcessor class
 
     def extract_references_dois(self, references: list[dict]) -> list[str]:
         """
@@ -89,65 +111,43 @@ class INSPIREHepAPI:
             if value is None:
                 break
         return value
+    
+    def get_data_concurrently(self) -> list[dict[str, any]]:
+        """
+        Get specific data fields for papers based on the query.
+        """
+        result: str = ""
+        all_pages_data = self.fetch_all_pages()
+        results = []
+        papers = [paper for page_data in all_pages_data for paper in page_data['hits']['hits']]
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            futures = [executor.submit(self.process_paper, paper) for paper in papers]
+            for future in concurrent.futures.as_completed(futures):
+                results.append(future.result())
+        
+        return results
 
     def get_data(self) -> list[dict[str, any]]:
         """
         Get specific data fields for papers based on the query.
         """
-        data = self.__fetch()
+        result: str = ""
+        data = self.fetch_all_pages()
         results = []
-        for paper in data['hits']['hits']:
-            metadata = paper['metadata']
-            result = {}
-            for field in self.fields:
-                value = self.extract_nested_field(metadata, field)
-                if field == "references.reference.dois" and value:
-                    result[field] = self.extract_references_dois(metadata.get("references", []))
-                else:
-                    result[field] = value
-            results.append(result)
-            print(result)
-            print('\n')
+        for page_data in data:
+            for paper in page_data['hits']['hits']:
+                result = self.process_paper(paper)
+                results.append(result)
+        
         return results
-
-
-if __name__ == "__main__":
-
-    fields = ['titles.title','dois.value', 'imprints.date',
-              'citation_count', 'references.reference.dois','authors.recid']
-    #'publication_info.artid'
-    api = INSPIREHepAPI(fields=fields)
-    # sort-order: mostrecent, mostcited
-    # Construct the query
-    start_date_str, end_date_str = get_date_range(days = 90)
-    print(start_date_str)
-    print(end_date_str)
-    query = f"date:[{start_date_str} TO {end_date_str}]&citation_count_without_self_citations"
-    print(query)
-    api.set_query(query)
-    data: list[dict[str]] = api.get_data()
-    print(len(data))
-    ref_list: list[str] = []
-    for paper in data:
-        if paper.get("references.reference.dois") is not None:
-            #print(f'LEN: {len(paper["references.reference.dois"])}')
-            ref_list.extend(paper["references.reference.dois"])
-        #else:
-            #print('LEN: 0')
-    #print(f'LENGTH: {len(ref_list)}\n {ref_list}')
-    
-    series = pd.Series(ref_list).value_counts()
-    print(series)
-    print(f'LENGTH: {len(ref_list)}')
-    # Limit to top 5 categories
-    top_n = 15
-    limited_series = series.nlargest(top_n).sort_values(ascending=True)
-    limited_series.plot.barh()
-    plt.title(f'Top {top_n} Citations')
-
-    # Adjust layout to show full y labels
-    plt.tight_layout()
-    plt.show()
-    
-    # REPEATING PAPERS!
+    def process_paper(self, paper: dict) -> dict[str,any]:
+        metadata = paper['metadata']
+        result = {}
+        for field in self.fields:
+            value = self.extract_nested_field(metadata, field)
+            if field == "references.reference.dois" and value:
+                result[field] = self.extract_references_dois(metadata.get("references", []))
+            else:
+                result[field] = value
+        return result
  

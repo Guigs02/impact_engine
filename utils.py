@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from dateutil.relativedelta import relativedelta  # Helps to subtract months accurately
 import requests
 
 class INSPIREHepAPI:
@@ -16,7 +17,7 @@ class INSPIREHepAPI:
         params = {
             'q': query,
             'size': '1000',  # Adjust as necessary, or paginate
-            'fields': 'citation_count,titles,title'
+            'fields': 'citation_count,titles.title'
         }
         
         response = requests.get(self.base_url, headers=self.headers, params=params)
@@ -38,14 +39,19 @@ if __name__ == "__main__":
     api.get_author_citations(recid)
 
 
-def get_date_range(days:str = 60) -> tuple[str, str]:
-        # Calculate the date range for the last two months
-        end_date = datetime.now()
-        start_date = end_date - timedelta(days=days)
-
-        # Format the dates in the required format (YYYY-MM-DD)
-        start_date_str = start_date.strftime('%Y-%m-%d')
-        end_date_str = end_date.strftime('%Y-%m-%d')
-
-        # Construct the query
-        return start_date_str, end_date_str
+def get_date_range(months: int, end_date: str = "") -> tuple[str, str]:
+    # If end_date is not provided, use the current date
+    if end_date == "":
+        end_date_obj = datetime.now()
+    else:
+        end_date_obj = datetime.strptime(end_date, '%Y-%m-%d')
+    
+    # Subtract the number of months from the end_date
+    start_date_obj = end_date_obj - relativedelta(months=months)
+    
+    # Format the dates in the required format (YYYY-MM-DD)
+    start_date_str = start_date_obj.strftime('%Y-%m-%d')
+    end_date_str = end_date_obj.strftime('%Y-%m-%d')
+    
+    # Return the start and end dates as strings
+    return start_date_str, end_date_str
