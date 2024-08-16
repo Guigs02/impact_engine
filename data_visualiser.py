@@ -8,7 +8,7 @@ class DataVisualiser:
         df = pd.DataFrame(data_list).value_counts()
         print(f'LENGTH: {len(data_list)}')
         # Limit to top 5 categories
-        top_n = 15
+        top_n = 30
         limited_df = df.nlargest(top_n).sort_values(ascending=True)
         print(limited_df)
         limited_df.plot.barh()

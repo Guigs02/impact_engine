@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta  # Helps to subtract months accurately
 import requests
+from pandas import DataFrame
+import pandas as pd
 
 class INSPIREHepAPI:
     def __init__(self):
@@ -39,19 +41,31 @@ if __name__ == "__main__":
     api.get_author_citations(recid)
 
 
-def get_date_range(months: int, end_date: str = "") -> tuple[str, str]:
+def get_date_range(days: int, end_date_obj: datetime) -> datetime:
     # If end_date is not provided, use the current date
-    if end_date == "":
-        end_date_obj = datetime.now()
-    else:
-        end_date_obj = datetime.strptime(end_date, '%Y-%m-%d')
     
     # Subtract the number of months from the end_date
-    start_date_obj = end_date_obj - relativedelta(months=months)
+    start_date_obj = end_date_obj - relativedelta(days=days)
     
     # Format the dates in the required format (YYYY-MM-DD)
-    start_date_str = start_date_obj.strftime('%Y-%m-%d')
-    end_date_str = end_date_obj.strftime('%Y-%m-%d')
+    #start_date_str = start_date_obj.strftime('%Y-%m-%d')
+    #end_date_str = end_date_obj.strftime('%Y-%m-%d')
     
     # Return the start and end dates as strings
-    return start_date_str, end_date_str
+    return start_date_obj
+
+def str_to_obj(date_str: str) -> datetime:
+    return datetime.strptime(date_str, '%Y-%m-%d')
+
+def obj_to_str(date_obj: datetime) -> str:
+    return date_obj.strftime('%Y-%m-%d')
+
+def get_period_differences(df: DataFrame)->DataFrame:
+    periods = df.columns[1:].tolist()
+    diffs = []
+    for i in range(len(periods) - 1):
+        diff_col = f'Diff_{periods[i]}_vs_{periods[i+1]}'
+        df[diff_col] = (df[periods[i]] - df[periods[i+1]]) / (df[periods[0]] - df[periods[1]])
+        diffs.append(diff_col)
+
+

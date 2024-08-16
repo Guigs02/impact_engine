@@ -3,10 +3,24 @@ from typing import List, Dict, Any, Union, Set
 import concurrent.futures
 import pandas as pd
 from pandas import DataFrame
+import pickle
+import json
 
 class DataProcessor:
     def __init__(self, fields: List[str]):
         self.fields = fields
+    
+    def pickle_json(self, response: List[Dict], file_name: str = "response.pkl") -> None:
+        
+        with open(file_name, "wb") as f:
+            pickle.dump(response, f)
+        f.close()
+
+    def depickle_to_json(self, file_name: str = "response.pkl") -> List[Dict]:
+        with open(file_name, "rb") as f:
+            json_data = pickle.load(f)
+        f.close()
+        return json_data
 
     def extract_fields_concurrently(self, raw_data: List[Dict]) -> List[Dict[str, Any]]:
         """
@@ -21,7 +35,24 @@ class DataProcessor:
         result: str = ""
         all_pages_data = raw_data
         results = []
-        papers = [paper for page_data in all_pages_data for paper in page_data['hits']['hits']]
+        # Validate and parse data
+        papers = []
+        for page_data in raw_data:
+            # Check if page_data is a string and try to parse it
+            if isinstance(page_data, str):
+                try:
+                    page_data = json.loads(page_data)
+                except json.JSONDecodeError as e:
+                    print(f"Error decoding JSON: {e}. Skipping this entry.")
+                    continue
+
+            # Ensure page_data is a dictionary and contains the expected structure
+            if isinstance(page_data, dict) and 'hits' in page_data and 'hits' in page_data['hits']:
+                papers.extend(page_data['hits']['hits'])
+            else:
+                print("Unexpected data format in page_data. Skipping this entry.")
+        
+       
         with concurrent.futures.ThreadPoolExecutor() as executor:
             futures = [executor.submit(self.process_paper, paper) for paper in papers]
             for future in concurrent.futures.as_completed(futures):
@@ -123,7 +154,7 @@ class DataProcessor:
     # Define a function to normalize and extract information from the 'references' column
     def normalise_references(self, df: DataFrame, column_name: str):
         # Normalize the column
-        normalized_df = pd.json_normalize(df[column_name].explode())
+        normalised_df = pd.json_normalize(df[column_name].explode())
         
-        return normalized_df
+        return normalised_df
         

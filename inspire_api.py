@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from api_client import APIClient
 from utils import get_date_range
+import pickle
+from typing import List, Dict, Any, Union, Set
 
 
 class INSPIREHepAPI(APIClient):
@@ -48,12 +50,10 @@ class INSPIREHepAPI(APIClient):
         else:
             response.raise_for_status()
 
-    def fetch_all_pages(self) -> list[dict]:
+    def fetch_all_pages(self, pages: int = 10) -> list[dict]:
         page: int = 1
         all_responses: list[dict] = []
         while True:
-            if page == 10:
-                break
             response_page = self._fetch(page=page)
             #print(response_page)
             hits = response_page.get('hits', {}).get('hits', [])
@@ -63,13 +63,29 @@ class INSPIREHepAPI(APIClient):
             #print(all_responses)
             page += 1
         #print(f'Page {page} fetched, total results: {len(all_responses)}')
-
+        print(all_responses)
         return all_responses
+    
+    def fetch_all_pages_concurrently(self, pages: int = 10 ) -> List[Dict]:
+        out: List[Dict] = []
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            futures = [executor.submit(self._fetch, page) for page in range(1,pages+1)]
+            for future in concurrent.futures.as_completed(futures):
+                try:
+                    data = future.result()
+                except Exception as exc:
+                    data = str(type(exc))
+                finally:
+                    out.append(data)
+                    
+        return out
     
     def get_paper(self, dois: str) -> dict:
         query :str = f'dois.value:{dois}'
         self.set_params(q=query)
         return self._fetch()
+    
+
    ################################################################################### 
     # In DataProcessor class
 
