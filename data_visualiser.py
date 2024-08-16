@@ -6,7 +6,6 @@ from typing import List, Dict, Any, Union, Set
 class DataVisualiser:
     def to_df(self, data_list: List[str])-> DataFrame:
         df = pd.DataFrame(data_list).value_counts()
-        print(df)
         print(f'LENGTH: {len(data_list)}')
         # Limit to top 5 categories
         top_n = 15

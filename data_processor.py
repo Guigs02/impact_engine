@@ -1,6 +1,8 @@
 from api_client import APIClient
 from typing import List, Dict, Any, Union, Set
 import concurrent.futures
+import pandas as pd
+from pandas import DataFrame
 
 class DataProcessor:
     def __init__(self, fields: List[str]):
@@ -65,6 +67,7 @@ class DataProcessor:
             else:
                 result[field] = value
         return result
+    
     def extract_references_dois(self, references: list[dict]) -> list[str]:
         """
         Extracts the 'dois' from each reference in the references list.
@@ -81,6 +84,7 @@ class DataProcessor:
             if dois:
                 dois_set.update(dois)
         return dois_set
+    
 
     def extract_nested_field(self, data: dict, field: str) -> any:
         """
@@ -116,3 +120,10 @@ class DataProcessor:
                 ref_list.extend(paper[info])
         return ref_list
     
+    # Define a function to normalize and extract information from the 'references' column
+    def normalise_references(self, df: DataFrame, column_name: str):
+        # Normalize the column
+        normalized_df = pd.json_normalize(df[column_name].explode())
+        
+        return normalized_df
+        

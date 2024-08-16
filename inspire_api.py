@@ -9,7 +9,7 @@ from utils import get_date_range
 
 
 class INSPIREHepAPI(APIClient):
-    def __init__(self, record: str = "literature", q: str = "", sort: str = None, size: str = "5", fields: list[str] = []):
+    def __init__(self, record: str = "literature", q: str = "", sort: str = None, size: str = "1000", fields: list[str] = []):
         # Initialise
         self.base_url = f"https://inspirehep.net/api"
         self.record = record
@@ -52,7 +52,7 @@ class INSPIREHepAPI(APIClient):
         page: int = 1
         all_responses: list[dict] = []
         while True:
-            if page == 2:
+            if page == 10:
                 break
             response_page = self._fetch(page=page)
             #print(response_page)

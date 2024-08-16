@@ -4,6 +4,7 @@ from inspire_api import INSPIREHepAPI
 from utils import get_date_range
 from data_visualiser import DataVisualiser
 from typing import List, Dict, Any, Union, Set
+import pandas as pd
 
 class DataPipelineFacade:
     def __init__(self, api: APIClient, data_processor: DataProcessor, data_visualiser: DataVisualiser):
@@ -48,7 +49,7 @@ class DataPipelineFacade:
 
         rf_list: List[str] = self.data_processor.get_info_from_papers(processed_data)
         #rf_list: List[str] = self.data_processor.extract_parameters(processed_data)
-        print(rf_list)
+        #print(rf_list)
 
         # Step 5: Visualise data
         self.data_visualiser.to_df(rf_list)
