@@ -8,6 +8,8 @@ from api_client import APIClient
 from utils import get_date_range
 import pickle
 from typing import List, Dict, Any, Union, Set
+import aiohttp
+import asyncio
 
 
 class INSPIREHepAPI(APIClient):
@@ -49,22 +51,27 @@ class INSPIREHepAPI(APIClient):
             return response.json()
         else:
             response.raise_for_status()
+    async def fetch(self, session,page: int = 1) -> dict:
+        params = {
+            'q': self.q,
+            'sort': self.sort,
+            'size': self.size,
+            'page': page
+        }
+    
+        async with session.get(url=f'{self.base_url}/{self.record}', headers=self.headers, params=params) as response:
+            if response.status_code == 200:
+                return response.json()
+            else:
+                response.raise_for_status()
 
-    def fetch_all_pages(self, pages: int = 10) -> list[dict]:
-        page: int = 1
-        all_responses: list[dict] = []
-        while True:
-            response_page = self._fetch(page=page)
-            #print(response_page)
-            hits = response_page.get('hits', {}).get('hits', [])
-            if not hits:
-                break
-            all_responses.append(response_page)
-            #print(all_responses)
-            page += 1
-        #print(f'Page {page} fetched, total results: {len(all_responses)}')
-        print(all_responses)
-        return all_responses
+    async def fetch_all_pages(self, session, pages: int = 10) -> List[Dict]:
+        tasks: List[Dict] = []
+        for page in range(1, pages+1):
+            task = asyncio.create_task(self.fetch(session, page))
+            tasks.append(task)
+        results = await asyncio.gather(*tasks)
+        return results
     
     def fetch_all_pages_concurrently(self, pages: int = 10 ) -> List[Dict]:
         out: List[Dict] = []

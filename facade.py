@@ -1,7 +1,7 @@
 from api_client import APIClient
 from data_processor import DataProcessor
 from inspire_api import INSPIREHepAPI
-from utils import get_date_range, str_to_obj, obj_to_str
+from utils import get_date_range, str_to_obj, obj_to_str, calculate_period_diff
 from data_visualiser import DataVisualiser
 from typing import List, Dict, Any, Union, Set
 import pandas as pd
@@ -10,10 +10,10 @@ from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 
 class DataPipelineFacade:
-    def __init__(self, api: APIClient, data_processor: DataProcessor, data_visualiser: DataVisualiser):
+    def __init__(self, api: APIClient, data_processor: DataProcessor):
         self.api = api
         self.data_processor = data_processor
-        self.data_visualiser = data_visualiser
+        
         
     def construct_query(self, start_date_str: str, end_date_str: str, control_number_range: str) -> str:
         """
@@ -32,11 +32,15 @@ class DataPipelineFacade:
     
     def execute(self, start_date: str, end_date: str, control_number_range: str = "10001->20000")-> DataFrame:
         """
-        Executes the data pipeline: retrieving, processing, analysing, and visualising the data.
+        Executes the data pipeline: retrieving, processing, analyzing, and visualizing the data.
         
         Args:
-            months (int): The number of months for the date range filter.
+            start_date (str): The start date for the date range filter.
+            end_date (str): The end date for the date range filter.
             control_number_range (str): The control number range for filtering results.
+        
+        Returns:
+            DataFrame: A DataFrame containing the processed data.
         """
         # Step 1: Construct the query
         query = self.construct_query(start_date, end_date, control_number_range)
@@ -55,7 +59,7 @@ class DataPipelineFacade:
         #print(rf_list)
         df = pd.DataFrame(rf_list).value_counts()
         df = df.reset_index()
-        df.columns = ['DOI', f'{start_date} - {end_date}']
+        df.columns = ['DOI', f'{start_date}-{end_date}']
         print(df.head())
         return df
         # Step 5: Visualise data
@@ -68,11 +72,10 @@ if __name__ == "__main__":
     
     api = INSPIREHepAPI(fields=fields)
     data_processor = DataProcessor(fields)
-    data_visualiser = DataVisualiser()
         
-    facade = DataPipelineFacade(api, data_processor, data_visualiser)
+    facade = DataPipelineFacade(api, data_processor)
     step: int = 90
-    begin = str_to_obj("2023-01-01")
+    begin = str_to_obj("2020.07.01")
     end_date = datetime.now()
     df_periods = pd.DataFrame()
     
@@ -84,7 +87,9 @@ if __name__ == "__main__":
                 df_periods = df
             else:
                 df_periods = pd.merge(df_periods, df, on='DOI', how='left')
-                print(df_periods)
             end_date = start_date - relativedelta(days=1)
         else: 
             break
+    df_periods.to_csv("citations_evolution.csv")
+    data_visualiser = DataVisualiser(df_periods)
+    data_visualiser.bubble_plot()

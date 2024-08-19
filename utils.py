@@ -3,6 +3,7 @@ from dateutil.relativedelta import relativedelta  # Helps to subtract months acc
 import requests
 from pandas import DataFrame
 import pandas as pd
+from typing import List
 
 class INSPIREHepAPI:
     def __init__(self):
@@ -55,17 +56,22 @@ def get_date_range(days: int, end_date_obj: datetime) -> datetime:
     return start_date_obj
 
 def str_to_obj(date_str: str) -> datetime:
-    return datetime.strptime(date_str, '%Y-%m-%d')
+    return datetime.strptime(date_str, '%Y.%m.%d')
 
 def obj_to_str(date_obj: datetime) -> str:
-    return date_obj.strftime('%Y-%m-%d')
+    return date_obj.strftime('%Y.%m.%d')
 
-def get_period_differences(df: DataFrame)->DataFrame:
+def calculate_period_diff(df: DataFrame)->DataFrame:
     periods = df.columns[1:].tolist()
     diffs = []
     for i in range(len(periods) - 1):
-        diff_col = f'Diff_{periods[i]}_vs_{periods[i+1]}'
-        df[diff_col] = (df[periods[i]] - df[periods[i+1]]) / (df[periods[0]] - df[periods[1]])
+        diff_col = f'{periods[i]}vs{periods[i+1]}'
+        df[diff_col] = (df[periods[i]]) / (df[periods[0]])
+        #df[diff_col] = (df[periods[i]] - df[periods[i+1]]) / (df[periods[0]] - df[periods[1]])
         diffs.append(diff_col)
+    return df
+
+def wrap_labels(labels: List, width: int):
+    return [label[:width] + '\n' + label[width:] for label in labels]
 
 
