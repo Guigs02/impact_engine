@@ -1,76 +1,46 @@
-from typing import List, Dict, Any
-import pandas as pd
+from data_processor import DataProcessor
+from plot_strategy import PlotStrategy, BarPlot, BubblePlot, ScatterPlot
 from pandas import DataFrame
-import matplotlib.pyplot as plt
-import matplotlib.cm as cm
-import textwrap
+import pandas as pd
+from utils import extract_matching_string, replace_latex_symbols
 
 class DataOutput:
-    def bar_plot(self, csv_path: str, columns: List[str], n: int = 10) -> None: 
-        df = pd.read_csv(csv_path).drop(columns=columns)
-        limited_df = df.nlargest(n, ['citation_count']).sort_values(by=['citation_count'],ascending=True)
-        ax = limited_df.plot.barh(x='title', y='citation_count', legend = False)
-        plt.title(f'Top {n} Citations')
-        wrapped_labels = [textwrap.fill(title, width=35) for title in limited_df['title']]
-
-        # Adjust layout to show full y labels
-        plt.tight_layout()
-        plt.subplots_adjust(left=0.4)  # Adjust left margin to make space for labels
-        ax.set_yticklabels(wrapped_labels, fontsize=9, ha='right')
-        plt.show()
-    def bubble_plot(self, csv_path: str, top_n: int = 10, col: int = 2) -> None:
-            df = pd.read_csv(csv_path).reset_index(drop = True)
-            periods = df.columns[2:].tolist()
-            limited_df = df.nlargest(top_n, columns=df.columns[col])
-            diffs = self.calculate_period_diff(limited_df, periods)
-            plot_data = []
-            for i, period in enumerate(periods[:]):
-                for j, row in limited_df.iterrows():
-                    plot_data.append({
-                        'Recid': row['Recid'],
-                        'Period': period,
-                        'Citations': row[period],
-                        'Diff': row[diffs[i]]
-                    })
-
-            plot_df = pd.DataFrame(plot_data)
-
-            # Generate a color map
-            cmap = cm.get_cmap('tab10')  # You can choose any colormap you like
-            colours = {recid: cmap(i) for i, recid in enumerate(limited_df['Recid'].unique())}
-
-            plt.figure(figsize=(12, 8))
-
-            for recid in plot_df['Recid'].unique():
-                subset = plot_df[plot_df['Recid'] == recid]
-                plt.scatter(subset['Period'], subset['Citations'], s=subset['Diff']*500, alpha=0.95, label=recid, color=colours[recid])
-
-            plt.gca().invert_xaxis()
-            plt.xlabel('Time Periods')
-            plt.ylabel('Number of Citations')
-            plt.title('Bubble Chart of Citation Differences')
-            plt.xticks(rotation=30, ha='right')
-            plt.legend()
-            plt.tight_layout()
-            plt.show()
-
-    def calculate_period_diff(self, df: DataFrame, periods: List)->DataFrame:
-        diffs = []
+    def __init__(self, data_processor: DataProcessor, plot_strategy: PlotStrategy):
+        self.data_processor = data_processor
+        self.plot_strategy = plot_strategy
+    
+    def process_and_plot(self, csv_path: str, *args, **kwargs) -> None:
+        df = self.data_processor.load_csv(csv_path)
         print(df)
-        for i in range(len(periods)):
-            #diff_col = f'{periods[i]}vs{periods[i+1]}'
-            diff_col = f'{periods[i]} (%)'
-            print(df[periods[i]])
-            df[diff_col] = (df[periods[i]]) / (df[periods[0]])
-            #df[diff_col] = (df[periods[i]] - df[periods[i+1]]) / (df[periods[0]] - df[periods[1]])
-            diffs.append(diff_col)
-        self.df = df
-        df.to_csv("out.csv")
-        print(self.df)
-        return diffs
+        df = self.data_processor.filter_columns(df, kwargs.get("columns_to_drop", []))
 
-
+        if isinstance(self.plot_strategy, BubblePlot):
+            periods = df.columns[kwargs.get('col'):].tolist()
+            df = self.data_processor.calculate_period_diff(df, periods)
+        elif isinstance(self.plot_strategy, ScatterPlot):
+            periods = df.columns[kwargs.get('col'):].tolist()
+        else:
+            df['title'] = df['title'].apply(lambda x: replace_latex_symbols(x) if isinstance(x, str) else x)
+        self.plot_strategy.plot(df, *args, **kwargs)
+        
 if __name__ == "__main__":
-    graph = DataOutput()
-    #graph.bar_plot("top200_2020-05-28_2020-08-26.csv",['control_number'])
-    graph.bubble_plot("out_cit_evo.csv")
+    data_processor = DataProcessor()
+
+    # Bar Plot Example
+    """ csv_file = "top200_2024-07_2024-08.csv"
+    title_date = extract_matching_string(csv_file, r"\d{4}-\d{2}_\d{4}-\d{2}")
+    title_date = title_date.replace('_', ' to ')
+    bar_plot_strategy = BarPlot(f"Top {title_date}")
+    data_output_bar = DataOutput(data_processor, bar_plot_strategy)
+    data_output_bar.process_and_plot(csv_file, x_column='title', y_column='citation_count', n=10)
+
+    # Bubble Plot Example
+    bubble_plot_strategy = BubblePlot()
+    data_output_bubble = DataOutput(data_processor, bubble_plot_strategy)
+    data_output_bubble.process_and_plot("out_cit_evo.csv", col = 1) """
+
+    # Scatter Plot Example
+    scatter_plot_strategy = ScatterPlot()
+    data_output_scatter = DataOutput(data_processor, scatter_plot_strategy)
+    data_output_scatter.process_and_plot("out_cit_evo.csv", col = 1)
+    data_output_scatter.process_and_plot("out_single_timeframe.csv", col = 1)

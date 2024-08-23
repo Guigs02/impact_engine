@@ -2,7 +2,7 @@ import requests
 from typing import List, Dict, Any
 import pandas as pd
 from pandas import DataFrame
-from utils import str_to_obj, obj_to_str, get_date_range
+from utils import *
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 
@@ -85,36 +85,125 @@ def get_refs_list(papers_list: List[Dict])->List:
         refs.append(paper['references'][0])
  """
 
+def process_single_timeframe(fields: str, start_date_str: str, end_date_str: str) -> DataFrame:
+    """
+    Processes data for a single timeframe and returns a DataFrame with citation counts.
+
+    Args:
+        fields (str): Fields to retrieve from the API.
+        start_date_str (str): Start date of the timeframe.
+        end_date_str (str): End date of the timeframe.
+
+    Returns:
+        DataFrame: A DataFrame containing citation counts for the specified timeframe.
+    """
+    papers_list = get_papers_list(fields, start_date_str, end_date_str)
+    
+    # Save papers list to CSV
+    pd.DataFrame(papers_list).drop(columns=['references']).to_csv(f"top200_{start_date_str}_{end_date_str}.csv", index=False)
+    
+    # Extract references and count them
+    refs_list = get_refs_list(papers_list)
+    df = pd.DataFrame(refs_list).value_counts().reset_index()
+    
+    # Rename columns appropriately
+    column_date = concatenate_name_dates(str_to_obj(start_date_str), str_to_obj(end_date_str))
+    df.columns = ['recid', column_date]
+    
+    return df
+def process_timeframe_series(fields: str, last_timeframe: datetime, first_timeframe: datetime, step: int = 2) -> DataFrame:
+    """
+    Iterates over a series of timeframes and processes each one.
+
+    Args:
+        fields (str): Fields to retrieve from the API.
+        last_timeframe (datetime): The latest date in the timeframe series.
+        first_timeframe (datetime): The earliest date in the timeframe series.
+        step (int): Number of months to step back for each iteration.
+
+    Returns:
+        DataFrame: A DataFrame containing merged citation counts across all timeframes.
+    """
+    df_periods = pd.DataFrame()
+    last_timeframe_start, last_timeframe_end = get_period_for_date(last_timeframe)
+    timeframe_start, timeframe_end = get_period_for_date(first_timeframe)
+    while True:
+        if timeframe_start >= last_timeframe_start:
+            start_date_str = obj_to_str(timeframe_start)
+            end_date_str = obj_to_str(timeframe_end)
+            
+            df = process_single_timeframe(fields, start_date_str, end_date_str)
+            
+            if df_periods.empty:
+                df_periods = df
+            else:
+                df_periods = pd.merge(df_periods, df, on='recid', how='left')
+                
+            # Move to the previous period
+            timeframe_end -= relativedelta(months=step)
+            timeframe_start -= relativedelta(months=step)
+        else:
+            break
+    
+    return df_periods
 
 if __name__ == "__main__":
-    fields = 'titles.title,recid,citation_count,references.record'
-    step: int = 90
-    begin_date = str_to_obj("2020-05-01")
+    api_fields = 'titles.title,recid,citation_count,references.record'
+    
+    # Define the range of dates
+    start_date = datetime(2020, 4, 1)
     end_date = datetime.now()
+    
+    # Choose whether to process one timeframe or the entire series of timeframes
+    process_single_timeframe_only = True  # Change to True to process only one timeframe
+    
+    if process_single_timeframe_only:
+        start_period_start, start_period_end = get_period_for_date(end_date)
+        start_date_str = obj_to_str(start_period_start)
+        end_date_str = obj_to_str(start_period_end)
+        
+        df = process_single_timeframe(api_fields, start_date_str, end_date_str)
+        df.to_csv("out_single_timeframe.csv", index=False)
+    else:
+        citation_evolution_df = process_timeframe_series(api_fields, start_date, end_date, step=2)
+        citation_evolution_df.to_csv("out_cit_evo.csv", index=False)
+
+
+
+""" if __name__ == "__main__":
+    fields = 'titles.title,recid,citation_count,references.record'
+    step: int = 2
+    begin_obj = datetime(2020,4,1)
+    begin_period_start, begin_period_end = get_period_for_date(begin_obj)
+    end_obj = datetime.now()
+    end_period_start, end_period_end = get_period_for_date(end_obj)
+    print(end_period_end)
+    print(end_period_start)
     df_periods = pd.DataFrame()
     while True:
-        start_date = get_date_range(step, end_date)
-        if start_date >= begin_date:
-            start_date_str = obj_to_str(start_date)
-            end_date_str = obj_to_str(end_date)
+        if end_period_start >= begin_period_start:
+            start_date_str = obj_to_str(end_period_start)
+            end_date_str = obj_to_str(end_period_end)
 
             papers_list= get_papers_list(fields, start_date_str,end_date_str)
-            pd.DataFrame(papers_list).drop(columns = ['references']).to_csv(f"top200_{start_date_str}_{end_date_str}.csv")
+            pd.DataFrame(papers_list).drop(columns = ['references']).to_csv(f"top200_{start_date_str}_{end_date_str}.csv", index=False)
 
             refs_list = get_refs_list(papers_list)
             df = pd.DataFrame(refs_list).value_counts()
             df = df.reset_index()
-            df.columns = ['recid', f'{start_date_str}_{end_date_str}']
+            column_date = concatenate_name_dates(end_period_start, end_period_end)
+            df.columns = ['recid', column_date]
             
             if df_periods is not None:
                 if df_periods.empty:
                     df_periods = df
                 else:
                     df_periods= pd.merge(df_periods, df, on='recid', how='left')
-            end_date = start_date - relativedelta(days=1) 
+            end_period_end -= relativedelta(months=2)
+            end_period_start -= relativedelta(months=2)
         else: 
             break
-    df_periods.to_csv("out_cit_evo.csv")
+    df_periods.to_csv("out_cit_evo.csv", index= False) """
    
 
    
