@@ -6,6 +6,30 @@ from utils import *
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 
+def make_api_request(url: str, headers: Dict[str, str]) -> Dict[str, Any]:
+    """
+    Makes an API request to the given URL and returns the JSON response.
+
+    Args:
+        url (str): The full URL to make the request to.
+        headers (Dict[str, str]): Headers to include in the request.
+
+    Returns:
+        Dict[str, Any]: Parsed JSON response from the API.
+
+    Raises:
+        Exception: If the API request fails.
+    """
+    response = requests.get(url, headers=headers)
+    
+    print("Request URL:", response.url)  # Debugging
+
+    if response.status_code == 200:
+        return response.json()
+    else:
+        raise Exception(f"API request failed with status code {response.status_code}: {response.text}")
+
+
 def get_records_info(fields: str, query: str, sort: str = 'mostcited', size: str = '200'):
     url = 'https://inspirehep.net/api/literature'
     url += f'?sort={sort}'
@@ -16,14 +40,21 @@ def get_records_info(fields: str, query: str, sort: str = 'mostcited', size: str
     headers = {
             "Accept": "application/json"  # Indicates that the client expects a JSON response
         }
-    response = requests.get(url=url, headers=headers)
-        #response = requests.get(url=f'{self.base_url}/{self.record}', headers=self.headers, params=params)
-    print(response.url)
-    if response.status_code == 200:
-        result = response.json()
-        return result["hits"]["hits"], result["hits"]["total"]
-    else:
-        response.raise_for_status()
+    # Make the API request and get the result
+    result = make_api_request(url, headers)
+
+    # Extract the relevant data
+    return result["hits"]["hits"], result["hits"]["total"]
+
+def get_paper_info(recid: str, fields: str) -> Dict:
+    response,_ = get_records_info(fields=fields, query = recid)
+    paper_info_dict = extract_field_dict(response)[0]
+    return paper_info_dict
+
+def get_citing_papers(recid: str, fields):
+    response = get_records_info(fields=fields, q = recid)
+    paper_info_dict = extract_field_dict(response)
+
 
 def extract_field_dict(data: List[Dict]) -> List[Dict[str, Any]]:
     """
@@ -57,6 +88,7 @@ def flatten_dict(paper: Dict) -> Dict:
                 new_dict = paper | sub_dict
                 del new_dict[key]
     return new_dict
+
 def construct_query(start_date_str: str, end_date_str: str) -> str:
     query = f'de {start_date_str}->{end_date_str}'
     return query
@@ -69,21 +101,11 @@ def get_papers_list(fields: str, start_date_str: str, end_date_str: str) -> List
 
 def get_refs_list(papers_list: List[Dict])->List:
     refs: List = []
-    """ print(papers_list[0])
-    print("")
-    print("")
-    print("NEW PAPER")
-    print("")
-    print("")
-    print(papers_list[1]) """
     refs = [
     ref for paper in papers_list if 'references' in paper 
     for ref in paper['references']
 ]
     return refs
-    """ for paper in papers_list:
-        refs.append(paper['references'][0])
- """
 
 def process_single_timeframe(fields: str, start_date_str: str, end_date_str: str) -> DataFrame:
     """
@@ -108,7 +130,7 @@ def process_single_timeframe(fields: str, start_date_str: str, end_date_str: str
     
     # Rename columns appropriately
     column_date = concatenate_name_dates(str_to_obj(start_date_str), str_to_obj(end_date_str))
-    df.columns = ['recid', column_date]
+    df.columns = ['recid_url', column_date]
     
     return df
 def process_timeframe_series(fields: str, last_timeframe: datetime, first_timeframe: datetime, step: int = 2) -> DataFrame:
@@ -125,8 +147,8 @@ def process_timeframe_series(fields: str, last_timeframe: datetime, first_timefr
         DataFrame: A DataFrame containing merged citation counts across all timeframes.
     """
     df_periods = pd.DataFrame()
-    last_timeframe_start, last_timeframe_end = get_period_for_date(last_timeframe)
-    timeframe_start, timeframe_end = get_period_for_date(first_timeframe)
+    last_timeframe_start, last_timeframe_end = get_period_for_date(last_timeframe, step)
+    timeframe_start, timeframe_end = get_period_for_date(first_timeframe, step)
     while True:
         if timeframe_start >= last_timeframe_start:
             start_date_str = obj_to_str(timeframe_start)
@@ -137,7 +159,7 @@ def process_timeframe_series(fields: str, last_timeframe: datetime, first_timefr
             if df_periods.empty:
                 df_periods = df
             else:
-                df_periods = pd.merge(df_periods, df, on='recid', how='left')
+                df_periods = pd.merge(df_periods, df, on='recid_url', how='left')
                 
             # Move to the previous period
             timeframe_end -= relativedelta(months=step)
@@ -147,63 +169,78 @@ def process_timeframe_series(fields: str, last_timeframe: datetime, first_timefr
     
     return df_periods
 
+def get_paper_details(recids: List[str], fields: str) -> DataFrame:
+    """
+    Fetches titles and preprint dates for the given recids.
+
+    Args:
+        recids (List[str]): List of recids for which to fetch data.
+
+    Returns:
+        DataFrame: DataFrame containing recid, title, and preprint date.
+    """
+    details: List[Dict] = []
+
+    for recid in recids:
+        paper_info = get_paper_info(recid=recid,fields=fields)
+        details.append(paper_info)
+    df: DataFrame = rename_dataframe_columns(pd.DataFrame(details), f'recid,{fields}')
+
+    return df
+
+def add_paper_details(df: DataFrame, details_df: DataFrame) -> DataFrame:
+    """
+    Add detailed information columns to the main DataFrame.
+    """
+    return pd.concat([details_df, df], axis = 1)
+
+def parse_fields(fields_str: str) -> List[str]:
+    fields = fields_str.split(',')
+    columns = []
+    for field in fields:
+        if '.' in field:
+            field_name = field.split('.')[-1]
+        else:
+            field_name = field
+        columns.append(field_name)
+    return columns
+
+def rename_dataframe_columns(df: DataFrame, fields_str: str) -> DataFrame:
+    print(df)
+    columns = parse_fields(fields_str)
+    df.columns = columns
+    return df
+
+
 if __name__ == "__main__":
     api_fields = 'titles.title,recid,citation_count,references.record'
+    details_fields = 'preprint_date,titles.title'
     
     # Define the range of dates
     start_date = datetime(2020, 4, 1)
     end_date = datetime.now()
+    step_back = 2
     
     # Choose whether to process one timeframe or the entire series of timeframes
-    process_single_timeframe_only = True  # Change to True to process only one timeframe
+    process_single_timeframe_only = False  # Change to True to process only one timeframe
     
     if process_single_timeframe_only:
-        start_period_start, start_period_end = get_period_for_date(end_date)
+        start_period_start, start_period_end = get_period_for_date(end_date, step=step_back)
         start_date_str = obj_to_str(start_period_start)
         end_date_str = obj_to_str(start_period_end)
         
         df = process_single_timeframe(api_fields, start_date_str, end_date_str)
-        df.to_csv("out_single_timeframe.csv", index=False)
     else:
-        citation_evolution_df = process_timeframe_series(api_fields, start_date, end_date, step=2)
-        citation_evolution_df.to_csv("out_cit_evo.csv", index=False)
+        df = process_timeframe_series(api_fields, start_date, end_date, step=step_back)
 
+    # Fetch and include paper details for the first 20 records
+    recid_urls = df['recid_url'].head(200).tolist()
+    recids = [extract_recid_from_url(url) for url in recid_urls]
+    details_df = get_paper_details(recids, details_fields)
+    df = add_paper_details(df, details_df)
 
+    # Save final DataFrame
+    df.to_csv("final_output.csv", index=False)
 
-""" if __name__ == "__main__":
-    fields = 'titles.title,recid,citation_count,references.record'
-    step: int = 2
-    begin_obj = datetime(2020,4,1)
-    begin_period_start, begin_period_end = get_period_for_date(begin_obj)
-    end_obj = datetime.now()
-    end_period_start, end_period_end = get_period_for_date(end_obj)
-    print(end_period_end)
-    print(end_period_start)
-    df_periods = pd.DataFrame()
-    while True:
-        if end_period_start >= begin_period_start:
-            start_date_str = obj_to_str(end_period_start)
-            end_date_str = obj_to_str(end_period_end)
-
-            papers_list= get_papers_list(fields, start_date_str,end_date_str)
-            pd.DataFrame(papers_list).drop(columns = ['references']).to_csv(f"top200_{start_date_str}_{end_date_str}.csv", index=False)
-
-            refs_list = get_refs_list(papers_list)
-            df = pd.DataFrame(refs_list).value_counts()
-            df = df.reset_index()
-            column_date = concatenate_name_dates(end_period_start, end_period_end)
-            df.columns = ['recid', column_date]
-            
-            if df_periods is not None:
-                if df_periods.empty:
-                    df_periods = df
-                else:
-                    df_periods= pd.merge(df_periods, df, on='recid', how='left')
-            end_period_end -= relativedelta(months=2)
-            end_period_start -= relativedelta(months=2)
-        else: 
-            break
-    df_periods.to_csv("out_cit_evo.csv", index= False) """
-   
 
    

@@ -29,3 +29,15 @@ class DataProcessor:
             diffs.append(diff_col)
         df.to_csv("out.csv", index=False)
         return df
+    def add_paper_details(self, df: DataFrame, details_df: DataFrame) -> DataFrame:
+            """
+            Merges the given DataFrame with additional paper details.
+
+            Args:
+                df (DataFrame): Original DataFrame.
+                details_df (DataFrame): DataFrame containing additional details like title and preprint date.
+
+            Returns:
+                DataFrame: Merged DataFrame with additional columns.
+            """
+            return pd.merge(df, details_df, on='recid', how='left')

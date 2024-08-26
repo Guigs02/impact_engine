@@ -6,6 +6,17 @@ import pandas as pd
 from typing import List
 import re
 
+def extract_recid_from_url(url: str) -> str:
+    """
+    Extract the recid from a given URL.
+
+    Args:
+        url (str): The URL containing the recid.
+
+    Returns:
+        str: The extracted recid.
+    """
+    return url.split('/')[-1]
 def extract_matching_string(input_string, pattern):
     match = re.search(pattern, input_string)
     if match:
@@ -67,21 +78,21 @@ def concatenate_name_dates(start_date: str, end_date: str):
     end_name = convert_date_to_names(end_date)
     return f"{start_name}-{end_name}"
 
-def get_periods_for_year(year: int):
+def get_periods_for_year(year: int, step: int):
     # Define the 6 periods of the year
     periods = []
-    for month in range(1, 13, 2):  # Start at month 1, increment by 2
+    for month in range(1, 13, step):  # Start at month 1, increment by step
         start_date = datetime(year, month, 1)
-        end_date = (start_date + relativedelta(months=2)) - relativedelta(days=1)
+        end_date = (start_date + relativedelta(months=step)) - relativedelta(days=1)
         periods.append((start_date, end_date))
     return periods
-def get_period_for_date(date_obj: datetime):
+def get_period_for_date(date_obj: datetime, step: int = 2):
     # Determine the year and month from the date object
     year = date_obj.year
     month = date_obj.month
     
     # Calculate periods
-    periods = get_periods_for_year(year)
+    periods = get_periods_for_year(year, step)
     
     # Find the period that contains the date
     for start_date, end_date in periods:
@@ -89,6 +100,7 @@ def get_period_for_date(date_obj: datetime):
             return start_date, end_date
     
     return None
+
 
 
 
