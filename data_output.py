@@ -33,7 +33,6 @@ class DataOutput:
     def process_and_plot(self, csv_path: str, *args, **kwargs) -> None:
         df = self.data_processor.load_csv(csv_path)
         df = self.data_processor.filter_columns(df, kwargs.get("columns_to_drop", []))
-        print(df)
         # Determine the starting index of period columns dynamically
         period_start_col = self.find_period_start_column(df)
 
