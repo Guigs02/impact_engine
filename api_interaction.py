@@ -22,7 +22,7 @@ def make_api_request(url: str, headers: Dict[str, str]) -> Dict[str, Any]:
     """
     response = requests.get(url, headers=headers)
     
-    print("Request URL:", response.url)  # Debugging
+    #print("Request URL:", response.url)  # Debugging
 
     if response.status_code == 200:
         return response.json()
@@ -52,8 +52,11 @@ def get_paper_info(recid: str, fields: str) -> Dict:
     return paper_info_dict
 
 def get_citing_papers(recid: str, fields):
-    response = get_records_info(fields=fields, q = recid)
+    response,_ = get_records_info(fields=fields, query = recid)
+    citing_list: List = []
     paper_info_dict = extract_field_dict(response)
+        
+    return paper_info_dict
 
 
 def extract_field_dict(data: List[Dict]) -> List[Dict[str, Any]]:
@@ -107,7 +110,7 @@ def get_refs_list(papers_list: List[Dict])->List:
 ]
     return refs
 
-def process_single_timeframe(fields: str, start_date_str: str, end_date_str: str) -> DataFrame:
+def process_single_timeframe(fields: str, start_date_str: str, end_date_str: str, generate_csv: bool) -> DataFrame:
     """
     Processes data for a single timeframe and returns a DataFrame with citation counts.
 
@@ -122,7 +125,8 @@ def process_single_timeframe(fields: str, start_date_str: str, end_date_str: str
     papers_list = get_papers_list(fields, start_date_str, end_date_str)
     
     # Save papers list to CSV
-    pd.DataFrame(papers_list).drop(columns=['references']).to_csv(f"top200_{start_date_str}_{end_date_str}.csv", index=False)
+    if generate_csv:
+        pd.DataFrame(papers_list).drop(columns=['references']).to_csv(f"top200_{start_date_str}_{end_date_str}.csv", index=False)
     
     # Extract references and count them
     refs_list = get_refs_list(papers_list)
@@ -133,7 +137,7 @@ def process_single_timeframe(fields: str, start_date_str: str, end_date_str: str
     df.columns = ['recid_url', column_date]
     
     return df
-def process_timeframe_series(fields: str, last_timeframe: datetime, first_timeframe: datetime, step: int = 2) -> DataFrame:
+def process_timeframe_series(fields: str, last_timeframe: datetime, first_timeframe: datetime, generate_csv: bool, step: int = 2) -> DataFrame:
     """
     Iterates over a series of timeframes and processes each one.
 
@@ -154,7 +158,7 @@ def process_timeframe_series(fields: str, last_timeframe: datetime, first_timefr
             start_date_str = obj_to_str(timeframe_start)
             end_date_str = obj_to_str(timeframe_end)
             
-            df = process_single_timeframe(fields, start_date_str, end_date_str)
+            df = process_single_timeframe(fields, start_date_str, end_date_str, generate_csv)
             
             if df_periods.empty:
                 df_periods = df
@@ -206,23 +210,26 @@ def parse_fields(fields_str: str) -> List[str]:
     return columns
 
 def rename_dataframe_columns(df: DataFrame, fields_str: str) -> DataFrame:
-    print(df)
     columns = parse_fields(fields_str)
     df.columns = columns
     return df
 
 
 if __name__ == "__main__":
-    api_fields = 'titles.title,recid,citation_count,references.record'
+    api_fields = 'titles.title,recid,preprint_date'
+    dicti = get_citing_papers("refersto:recid:2774173", api_fields)
+    print(dicti)
+    """ api_fields = 'titles.title,recid,citation_count,references.record'
     details_fields = 'preprint_date,titles.title'
     
     # Define the range of dates
     start_date = datetime(2020, 4, 1)
     end_date = datetime.now()
-    step_back = 2
+    step_back = 3
     
     # Choose whether to process one timeframe or the entire series of timeframes
     process_single_timeframe_only = False  # Change to True to process only one timeframe
+    
     
     if process_single_timeframe_only:
         start_period_start, start_period_end = get_period_for_date(end_date, step=step_back)
@@ -240,7 +247,7 @@ if __name__ == "__main__":
     df = add_paper_details(df, details_df)
 
     # Save final DataFrame
-    df.to_csv("final_output.csv", index=False)
+    df.to_csv("final_output.csv", index=False) """
 
 
    
