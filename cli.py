@@ -17,8 +17,8 @@ def create_parser():
     parser.add_argument("--step-back", type=int, default=2, help="Step back in months for the timeframe")
     parser.add_argument("--process-single-timeframe", action='store_true', help="Process only a single timeframe instead of the entire series")
     parser.add_argument("--generate-csvs", action='store_true', help="Generate CSV files for each timeframe")
-    parser.add_argument("--timeframe-plot-type", choices=["bar", "none"], default="none", help="Type of plot to generate for each timeframe's CSV (only bar plot is allowed)")
-    parser.add_argument("--final-plot-type", choices=["bubble", "scatter", "none"], default="scatter", help="Type of plot to generate for the final combined data")
+    parser.add_argument("--timeframe-plot", choices=["bar", "none"], default="none", help="Type of plot to generate for each timeframe's CSV (only bar plot is allowed)")
+    parser.add_argument("--final-plot", choices=["bubble", "scatter", "none"], default="scatter", help="Type of plot to generate for the final combined data")
     parser.add_argument("--output-file", type=str, default="final_output.csv", help="Name of the final output CSV file")
     parser.add_argument("--plot-csv", type=str, help="Specify a CSV file to plot instead of generating a new one")
     parser.add_argument("--recid", type=str, help="Specify the recid of the paper to find citing papers")
@@ -50,7 +50,7 @@ def main(args):
         print(f"Plotting the specified CSV file: {args.plot_csv}")
 
         data_processor = DataProcessor()
-        if args.timeframe_plot_type == "bar":
+        if args.timeframe_plot== "bar":
             title_date = extract_matching_string(args.plot_csv, r"\d{4}-\d{2}_\d{4}-\d{2}")
             title_date = title_date.replace('_', ' to ')
             plot_strategy = BarPlot(f"Top {title_date}")
@@ -58,7 +58,7 @@ def main(args):
             data_output = DataOutput(data_processor, plot_strategy)
             data_output.process_and_plot(args.plot_csv, x_column='title', y_column='citation_count', n=10)
         else:
-            if args.final_plot_type == "bubble":
+            if args.final_plot == "bubble":
                 plot_strategy = BubblePlot()
             else:
                 plot_strategy = ScatterPlot()
@@ -90,7 +90,7 @@ def main(args):
 
     if args.generate_csvs:
         print(f"CSV for the period {start_date_str} to {end_date_str} generated.")
-        if args.timeframe_plot_type == "bar":
+        if args.timeframe_plot == "bar":
             bar_plot_strategy = BarPlot(f"Top {start_date_str} to {end_date_str}")
             data_processor = DataProcessor()
             data_output = DataOutput(data_processor, bar_plot_strategy)
@@ -110,7 +110,7 @@ def main(args):
     # Final plot for the combined data (Bubble or Scatter)
     data_processor = DataProcessor()
     
-    if args.final_plot_type == "bubble":
+    if args.final_plot == "bubble":
         plot_strategy = BubblePlot()
     else:
         plot_strategy = ScatterPlot()

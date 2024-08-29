@@ -1,6 +1,5 @@
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta  # Helps to subtract months accurately
-import requests
 from pandas import DataFrame
 import pandas as pd
 from typing import List

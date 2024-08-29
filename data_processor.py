@@ -3,7 +3,6 @@ import pandas as pd
 from pandas import DataFrame
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
-import textwrap
 
 class DataProcessor:
     def load_csv(self, csv_path: str)-> DataFrame:
