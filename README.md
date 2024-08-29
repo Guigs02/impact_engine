@@ -95,7 +95,7 @@ python3 cli.py --plot-csv "top200_2024-05_2024-06.csv" --timeframe-plot bar
 - --recid: Specify the recid of the paper to find citing papers.
 - --save-citing-papers: Filename to save citing papers CSV.
 
-## License
+## Licence
 
-Distributed under the MIT License.
+Distributed under the MIT Licence.
 
