@@ -29,29 +29,41 @@ The Citation Analysis and Plotting Tool is designed to fetch citation data, gene
 1. **Clone the repository**:
    ```bash
    git clone https://github.com/Guigs02/impact-engine.git
+   ```
 
 2. **Navigate to the project directory**:
     ```bash
     cd impact-engine
+    ```
 
 3. **Install the required dependencies**:
     ```bash
     pip install -r requirements.txt
-
+    ```
 
 ## Usage
 
-### Basic Usage
+### Generate a CSV and Scatter Plot
 
 To generate a CSV file containing the most referenced papers among the most cited papers published within a user-defined time period. It then produces a scatter plot to visualise the evolution of these citations over time.
 
 ```bash
 python3 cli.py --start-date "2020-04-01" --final-plot scatter
 ```
+
+### Generate intermediate CSV files
+
 To generate intermediate CSV files for the most cited papers published within specific timeframes defined by a start and end date. Each one of these intermediate CSV files corresponds to a different period within the timeframe series:
 
 ```bash
 python3 cli.py --start-date "2020-04-01" --end-date "2023-04-01" --generate-csvs
+```
+### Analyse a single timeframe
+
+One can also choose to analyse a single timeframe. The following command would produce a bar plot for the last timeframe within the start and end date range. Afterwards, a scatter plot with the most cited references would be produced.
+
+```bash
+python3 cli.py --start-date "2020-04-01" --end-date "2020-06-01" --step-back 2 --process-single-timeframe --generate-csvs --timeframe-plot bar 
 ```
 
 ### Citing Papers
@@ -71,17 +83,17 @@ python3 cli.py --plot-csv "top200_2024-05_2024-06.csv" --timeframe-plot bar
 
 ## Arguments
 
---start-date: Start date for data collection (format: YYYY-MM-DD).
---end-date: End date for data collection (format: YYYY-MM-DD). Default: current date.
---step-back: Step back in months for the timeframe. Default: Two months
---process-single-timeframe: Process only a single timeframe.
---generate-csvs: Generate CSV files for each timeframe.
---timeframe-plot: Type of plot to generate for each timeframe's CSV (options: bar, none). Default: none.
---final-plot: Type of plot to generate for the final combined data (options: bubble, scatter, none). Default: scatter.
---output-file: Name of the final output CSV file. Default: "final_output.csv".
---plot-csv: Specify a CSV file to plot instead of generating a new one.
---recid: Specify the recid of the paper to find citing papers.
---save-citing-papers: Filename to save citing papers CSV.
+- --start-date: Start date for data collection (format: YYYY-MM-DD).
+- --end-date: End date for data collection (format: YYYY-MM-DD). Default: current date.
+- --step-back: Step back in months for the timeframe. Default: Two months
+- --process-single-timeframe: Process only a single timeframe.
+- --generate-csvs: Generate CSV files for each timeframe.
+- --timeframe-plot: Type of plot to generate for each timeframe's CSV (options: bar, none). Default: none.
+- --final-plot: Type of plot to generate for the final combined data (options: bubble, scatter, none). Default: scatter.
+- --output-file: Name of the final output CSV file. Default: "final_output.csv".
+- --plot-csv: Specify a CSV file to plot instead of generating a new one.
+- --recid: Specify the recid of the paper to find citing papers.
+- --save-citing-papers: Filename to save citing papers CSV.
 
 ## License
 
