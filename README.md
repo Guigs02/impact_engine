@@ -10,7 +10,7 @@ A command-line tool for analysing the most cited papers in InspireHep, with opti
   - [Citing Papers](#citing-papers)
   - [Plotting Options](#plotting-options)
 - [Arguments](#arguments)
-- [License](#license)
+- [Licence](#licence)
 
 ## Introduction
 
